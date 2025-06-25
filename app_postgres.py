@@ -38,7 +38,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.nome = ""
 
 # === INTERFACCIA ===
-st.set_page_config(page_title="Gioco del Coro", layout="centered")
+st.set_page_config(page_title="Gioco Musicale", layout="centered")
 st.markdown("""
     <style>
         .block-container {
