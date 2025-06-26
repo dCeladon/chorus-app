@@ -70,7 +70,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.image(Image.open(LOGO_PATH), width=250)
-st.title("\U0001F3B5 Gioco del Coro")
+st.title("\U0001F3B5 Gioco Musicale")
 
 # === LOGIN ===
 if not st.session_state.logged_in:
