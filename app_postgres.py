@@ -74,8 +74,8 @@ st.title("\U0001F3B5 Gioco Musicale")
 
 # === LOGIN ===
 if not st.session_state.logged_in:
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    username = st.text_input("Username").strip()
+    password = st.text_input("Password", type="password").strip()
 
     if st.button("Login"):
         conn = get_db_connection()
