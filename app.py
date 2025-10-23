@@ -1,10 +1,4 @@
-# app_brano_del_giorno.py
-# Streamlit app pubblica (senza login) che mostra ogni giorno un "Brano del Giorno"
-# - Esclude brani con punteggio < 6
-# - Rotazione nel tempo dal peggiore al migliore
-# - Ancoraggio su 23/10/2025: in quel giorno mostra il peggiore idoneo
-# - KPI visibili: Votanti, Punteggio (3 decimali), Posizione in classifica (1 = primo classificato)
-
+# app.py — Brano del Giorno (Streamlit Community, con secrets)
 import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
@@ -13,19 +7,11 @@ from zoneinfo import ZoneInfo
 from PIL import Image
 
 # ========== CONFIG ==========
-DB_CONFIG = {
-    'host': "aws-0-eu-central-2.pooler.supabase.com",
-    'port': 6543,
-    'database': "postgres",
-    'user': "postgres.vcbrxuggtttjaqmenslb",
-    'password': "&8aa9Y3rASYoBYC4"
-}
 LOGO_PATH = "chorus_logo_dei_30_ridotto.jpg"
 MIN_SCORE = 6.0
 TZ = ZoneInfo("Europe/Rome")
 ANCHOR_DATE = date(2025, 10, 23)
 
-# ========== ST PAGE ==========
 st.set_page_config(page_title="Brano del Giorno — CHORUS APS", layout="centered")
 st.markdown("""
 <style>
@@ -49,8 +35,19 @@ st.caption("CHORUS APS – Gruppo Ritmico Corale • Verona")
 
 # ========== HELPERS ==========
 def crea_engine_sqlalchemy():
-    url = f"postgresql+psycopg2://{DB_CONFIG['user']}:{DB_CONFIG['password']}@" \
-          f"{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+    """Crea l'engine leggendo le credenziali da st.secrets e forzando SSL (Supabase)."""
+    host = st.secrets.get("DB_HOST", "")
+    port = st.secrets.get("DB_PORT", "5432")
+    db   = st.secrets.get("DB_NAME", "")
+    user = st.secrets.get("DB_USER", "")
+    pwd  = st.secrets.get("DB_PASS", "")
+    sslm = st.secrets.get("DB_SSLMODE", "require")  # Supabase → 'require'
+
+    if not all([host, port, db, user, pwd]):
+        st.error("Credenziali DB mancanti nei Secrets. Vai in Settings → Secrets e impostale.")
+        st.stop()
+
+    url = f"postgresql+psycopg2://{user}:{pwd}@{host}:{port}/{db}?sslmode={sslm}"
     return create_engine(url)
 
 @st.cache_data(ttl=300)
@@ -80,8 +77,8 @@ def carica_classifica_df() -> pd.DataFrame:
 def scegli_brano_del_giorno(df: pd.DataFrame, giorno: date) -> pd.Series | None:
     """
     - Filtra brani idonei (punteggio ≥ MIN_SCORE).
-    - Assegna posizione_classifica = 1 al migliore.
-    - Ruota i brani partendo dal peggiore verso il migliore.
+    - posizione_classifica: 1 = migliore.
+    - Rotazione dal peggiore al migliore rispetto all'ANCHOR_DATE.
     """
     elig_desc = df[(df["punteggio_complessivo"].notna()) & (df["punteggio_complessivo"] >= MIN_SCORE)].copy()
     if elig_desc.empty:
@@ -100,7 +97,14 @@ def scegli_brano_del_giorno(df: pd.DataFrame, giorno: date) -> pd.Series | None:
 
 # ========== LOGICA ==========
 oggi = datetime.now(TZ).date()
-df_classifica = carica_classifica_df()
+
+try:
+    df_classifica = carica_classifica_df()
+except Exception as e:
+    st.error("Errore nel caricamento dati dal database.")
+    st.exception(e)
+    st.stop()
+
 scelto = scegli_brano_del_giorno(df_classifica, oggi)
 
 if scelto is None:
@@ -115,7 +119,7 @@ else:
     else:
         st.info("Nessun video disponibile per questo brano.")
 
-    # KPI: Votanti, Punteggio (3 decimali), Posizione in classifica
+    # KPI
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown("<div class='kpi'><div class='big'>"
